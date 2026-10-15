@@ -65,6 +65,9 @@ scenario:
     - destroy
     - create
     - prepare
+    # A dry run against hosts that have never had NUT — the case a fleet
+    # converge with check_mode=true hits on first rollout.
+    - check
     - converge
     - idempotence
     - verify

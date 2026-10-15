@@ -4,4 +4,7 @@
   ansible.builtin.systemd:
     name: "{{ nut_client_service_name }}"
     state: restarted
-  when: nut_client_service_state != 'stopped'
+  when:
+    - nut_client_service_state != 'stopped'
+    # Same check-mode guard as the service task in tasks/main.yml.
+    - not (ansible_check_mode and nut_client_install is changed)
