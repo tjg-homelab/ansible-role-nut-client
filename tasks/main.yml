@@ -22,6 +22,7 @@
     state: present
     update_cache: true
     cache_valid_time: 3600
+  register: nut_client_install
 
 - name: Deploy nut.conf
   become: true
@@ -63,8 +64,13 @@
     group: root
     mode: "0755"
 
+# Under --check on a host without NUT, the install above only *reports* a
+# change — the unit file never lands, so systemd cannot find nut-monitor.
+# Skip exactly that case; on a host that already has NUT, check mode still
+# verifies the service for real.
 - name: Ensure nut-monitor is in the desired state
   become: true
+  when: not (ansible_check_mode and nut_client_install is changed)
   ansible.builtin.systemd:
     name: "{{ nut_client_service_name }}"
     state: "{{ nut_client_service_state }}"
