@@ -64,6 +64,21 @@
     group: root
     mode: "0755"
 
+# On first install the package starts nut-monitor at once, against its stock
+# config (no MONITOR line). upsmon exits, systemd retries it 5 times in ~1.5s
+# (Restart=on-failure, 100ms) and trips the unit's start limit (5 per 10s).
+# If the start below lands inside that 10s window, systemd refuses it with
+# "Start request repeated too quickly" — a timing race this role lost on
+# docker01 on 2026-10-15 while docker02 won it. Clear the counter first; the
+# real config is in place by now.
+- name: Clear the start limit tripped by the package's first start
+  become: true
+  ansible.builtin.command: systemctl reset-failed {{ nut_client_service_name }}
+  when:
+    - nut_client_install is changed
+    - not ansible_check_mode
+  changed_when: false
+
 # Under --check on a host without NUT, the install above only *reports* a
 # change — the unit file never lands, so systemd cannot find nut-monitor.
 # Skip exactly that case; on a host that already has NUT, check mode still
