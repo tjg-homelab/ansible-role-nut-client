@@ -1,0 +1,7 @@
+---
+- name: Restart nut-monitor
+  become: true
+  ansible.builtin.systemd:
+    name: "{{ nut_client_service_name }}"
+    state: restarted
+  when: nut_client_service_state != 'stopped'

@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+CMDSCRIPT {{ nut_client_cmdscript_path }}
+PIPEFN /run/nut/upssched.pipe
+LOCKFN /run/nut/upssched.lock
+{% if nut_client_shutdown_delay | int > 0 %}
+
+# Shut down after {{ nut_client_shutdown_delay }}s continuously on battery; mains returning cancels it.
+AT ONBATT * START-TIMER {{ nut_client_shutdown_timer }} {{ nut_client_shutdown_delay }}
+AT ONLINE * CANCEL-TIMER {{ nut_client_shutdown_timer }}
+{% else %}
+
+# Timed shutdown disabled (nut_client_shutdown_delay: 0) — low battery / FSD only.
+{% endif %}

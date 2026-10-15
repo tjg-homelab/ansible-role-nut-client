@@ -1,0 +1,62 @@
+---
+# --- The UPS to watch -------------------------------------------------------
+# upsmon monitors one UPS on a remote NUT server (upsd) as a `secondary`: it
+# never talks to the UPS hardware and can never set FSD on it, so a client of
+# this role cannot shut down the server or any other client.
+#
+# nut_client_server and nut_client_password have no usable default — the role
+# asserts both are set.
+nut_client_ups_name: ups
+nut_client_server: ""
+nut_client_server_port: 3493
+
+# Credentials for an `upsmon secondary` user in the server's upsd.users.
+nut_client_user: monuser
+nut_client_password: ""
+
+# How many power supplies this UPS feeds on the host. 1 for every normal box.
+nut_client_power_value: 1
+
+# --- Timed shutdown ---------------------------------------------------------
+# Seconds the UPS must stay on battery before this host shuts itself down.
+# upssched starts the timer on ONBATT and cancels it on ONLINE, so an outage
+# shorter than this costs nothing. Stagger it per host to order a shutdown.
+#
+# 0 disables the timer: the host then only shuts down on NUT's own triggers
+# (low battery, or a forced shutdown from the server's primary).
+nut_client_shutdown_delay: 300
+
+# Timer name passed to the command script; only visible in logs.
+nut_client_shutdown_timer: onbatt-shutdown
+
+# Script upssched runs when a timer fires.
+nut_client_cmdscript_path: /usr/local/sbin/nut-upssched-cmd
+
+# --- upsmon tuning ----------------------------------------------------------
+nut_client_shutdown_cmd: /sbin/shutdown -h +0
+# Seconds between "shutdown is coming" and running nut_client_shutdown_cmd.
+nut_client_final_delay: 5
+nut_client_poll_freq: 5
+nut_client_poll_freq_alert: 5
+# Seconds without contact before the UPS is declared stale. A UPS that was last
+# seen on battery and then goes stale is treated as critical, so losing the
+# server mid-outage still shuts the client down.
+nut_client_deadtime: 15
+
+# --- Packaging --------------------------------------------------------------
+nut_client_packages:
+  - nut-client
+
+# Purged before install. Debian's nut-client declares `Conflicts: apcupsd`, and
+# two UPS daemons on one host is never what you want.
+nut_client_conflicting_packages:
+  - apcupsd
+
+# The unprivileged account upsmon drops to (Debian/Ubuntu package default);
+# owns the config files' group.
+nut_client_run_as_user: nut
+nut_client_upsmon_path: /sbin/upsmon
+
+nut_client_service_name: nut-monitor
+nut_client_service_state: started
+nut_client_service_enabled: true

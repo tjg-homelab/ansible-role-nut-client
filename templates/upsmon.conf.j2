@@ -1,0 +1,22 @@
+# {{ ansible_managed }}
+MONITOR {{ nut_client_ups_name }}@{{ nut_client_server }}:{{ nut_client_server_port }} {{ nut_client_power_value }} {{ nut_client_user }} "{{ nut_client_password }}" secondary
+MINSUPPLIES 1
+
+SHUTDOWNCMD "{{ nut_client_shutdown_cmd }}"
+FINALDELAY {{ nut_client_final_delay }}
+
+POLLFREQ {{ nut_client_poll_freq }}
+POLLFREQALERT {{ nut_client_poll_freq_alert }}
+DEADTIME {{ nut_client_deadtime }}
+
+# Every event is logged; ONBATT/ONLINE are also handed to upssched, which owns
+# the timed shutdown (see upssched.conf).
+NOTIFYCMD /sbin/upssched
+NOTIFYFLAG ONLINE   SYSLOG+EXEC
+NOTIFYFLAG ONBATT   SYSLOG+EXEC
+NOTIFYFLAG LOWBATT  SYSLOG
+NOTIFYFLAG FSD      SYSLOG
+NOTIFYFLAG COMMOK   SYSLOG
+NOTIFYFLAG COMMBAD  SYSLOG
+NOTIFYFLAG SHUTDOWN SYSLOG
+NOTIFYFLAG NOCOMM   SYSLOG

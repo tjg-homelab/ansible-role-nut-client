@@ -1,0 +1,12 @@
+---
+# Install the daemon the role must purge, so the purge is actually exercised
+# (cardinal carried a dead apcupsd before this role existed).
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Install apcupsd
+      ansible.builtin.apt:
+        name: apcupsd
+        state: present
+        update_cache: true

@@ -1,0 +1,100 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  vars:
+    expected_delay: "{{ nut_client_shutdown_delay | int }}"
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+
+    - name: Assert nut-client is installed and apcupsd is purged
+      ansible.builtin.assert:
+        that:
+          - "'nut-client' in ansible_facts.packages"
+          - "'apcupsd' not in ansible_facts.packages"
+
+    - name: Stat the NUT config files
+      ansible.builtin.stat:
+        path: "/etc/nut/{{ item }}"
+      register: nut_conf_stat
+      loop:
+        - nut.conf
+        - upsmon.conf
+        - upssched.conf
+
+    - name: Assert config files are root:nut 0640 (upsmon.conf holds a password)
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.mode == "0640"
+          - item.stat.pw_name == "root"
+          - item.stat.gr_name == "nut"
+      loop: "{{ nut_conf_stat.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Read nut.conf
+      ansible.builtin.slurp:
+        src: /etc/nut/nut.conf
+      register: nut_conf
+
+    - name: Read upsmon.conf
+      ansible.builtin.slurp:
+        src: /etc/nut/upsmon.conf
+      register: upsmon_conf
+
+    - name: Read upssched.conf
+      ansible.builtin.slurp:
+        src: /etc/nut/upssched.conf
+      register: upssched_conf
+
+    - name: Assert netclient mode and a secondary MONITOR line
+      ansible.builtin.assert:
+        that:
+          - "'MODE=netclient' in (nut_conf.content | b64decode)"
+          - >-
+            'MONITOR ups01@192.0.2.10:3493 1 monuser "molecule-not-a-secret" secondary'
+            in (upsmon_conf.content | b64decode)
+          - "'NOTIFYCMD /sbin/upssched' in (upsmon_conf.content | b64decode)"
+          - "'NOTIFYFLAG ONBATT   SYSLOG+EXEC' in (upsmon_conf.content | b64decode)"
+          - "'NOTIFYFLAG ONLINE   SYSLOG+EXEC' in (upsmon_conf.content | b64decode)"
+
+    - name: Assert the shutdown timer is set and cancelled on mains return
+      when: expected_delay | int > 0
+      ansible.builtin.assert:
+        that:
+          - "('AT ONBATT * START-TIMER onbatt-shutdown ' ~ expected_delay) in (upssched_conf.content | b64decode)"
+          - "'AT ONLINE * CANCEL-TIMER onbatt-shutdown' in (upssched_conf.content | b64decode)"
+
+    - name: Assert no timer when the delay is 0
+      when: expected_delay | int == 0
+      ansible.builtin.assert:
+        that:
+          - "'START-TIMER' not in (upssched_conf.content | b64decode)"
+
+    - name: Stat the upssched command script
+      ansible.builtin.stat:
+        path: /usr/local/sbin/nut-upssched-cmd
+      register: cmdscript
+
+    - name: Assert the command script is executable
+      ansible.builtin.assert:
+        that:
+          - cmdscript.stat.exists
+          - cmdscript.stat.mode == "0755"
+
+    # An unknown timer must only log — never shut anything down.
+    - name: Run the command script with an unknown timer
+      ansible.builtin.command: /usr/local/sbin/nut-upssched-cmd not-a-timer
+      changed_when: false
+
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Assert nut-monitor is enabled and running
+      ansible.builtin.assert:
+        that:
+          - "'nut-monitor.service' in ansible_facts.services"
+          - ansible_facts.services['nut-monitor.service'].status == 'enabled'
+          - ansible_facts.services['nut-monitor.service'].state == 'running'

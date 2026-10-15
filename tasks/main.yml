@@ -1,0 +1,74 @@
+---
+- name: Assert the NUT server and credentials are set
+  ansible.builtin.assert:
+    that:
+      - nut_client_server | length > 0
+      - nut_client_password | length > 0
+      - nut_client_shutdown_delay | int >= 0
+    fail_msg: nut_client_server and nut_client_password must be set, and nut_client_shutdown_delay must be >= 0
+    quiet: true
+
+- name: Purge conflicting UPS daemons
+  become: true
+  ansible.builtin.apt:
+    name: "{{ nut_client_conflicting_packages }}"
+    state: absent
+    purge: true
+
+- name: Install NUT client
+  become: true
+  ansible.builtin.apt:
+    name: "{{ nut_client_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Deploy nut.conf
+  become: true
+  ansible.builtin.template:
+    src: nut.conf.j2
+    dest: /etc/nut/nut.conf
+    owner: root
+    group: "{{ nut_client_run_as_user }}"
+    mode: "0640"
+  notify: Restart nut-monitor
+
+- name: Deploy upsmon.conf
+  become: true
+  ansible.builtin.template:
+    src: upsmon.conf.j2
+    dest: /etc/nut/upsmon.conf
+    owner: root
+    group: "{{ nut_client_run_as_user }}"
+    mode: "0640"
+  no_log: true
+  notify: Restart nut-monitor
+
+- name: Deploy upssched.conf
+  become: true
+  ansible.builtin.template:
+    src: upssched.conf.j2
+    dest: /etc/nut/upssched.conf
+    owner: root
+    group: "{{ nut_client_run_as_user }}"
+    mode: "0640"
+  notify: Restart nut-monitor
+
+- name: Deploy the upssched command script
+  become: true
+  ansible.builtin.template:
+    src: nut-upssched-cmd.j2
+    dest: "{{ nut_client_cmdscript_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ensure nut-monitor is in the desired state
+  become: true
+  ansible.builtin.systemd:
+    name: "{{ nut_client_service_name }}"
+    state: "{{ nut_client_service_state }}"
+    enabled: "{{ nut_client_service_enabled }}"
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers

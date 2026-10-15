@@ -1,0 +1,12 @@
+#!/bin/sh
+# {{ ansible_managed }}
+# Called by upssched with the name of the timer that fired.
+case "$1" in
+  {{ nut_client_shutdown_timer }})
+    logger -t nut-upssched-cmd "{{ nut_client_ups_name }} on battery for {{ nut_client_shutdown_delay }}s - shutting down"
+    {{ nut_client_upsmon_path }} -c fsd
+    ;;
+  *)
+    logger -t nut-upssched-cmd "unrecognised timer: $1"
+    ;;
+esac
